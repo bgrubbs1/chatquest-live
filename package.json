@@ -1,0 +1,10 @@
+{
+  "name": "chatquest-live",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "A chat-powered co-op dungeon for Twitch and OBS, with zero dependencies.",
+  "engines": { "node": ">=22" },
+  "scripts": { "start": "node src/server.js", "demo": "node src/server.js --demo", "test": "node --test" },
+  "license": "MIT"
+}

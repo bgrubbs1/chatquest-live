@@ -1,0 +1,16 @@
+<!doctype html>
+<!-- OBS overlay: all game content is rendered from structured SSE state. -->
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>ChatQuest Live · Dungeon</title><link rel="stylesheet" href="/style.css"><script src="/app.js" defer></script></head>
+<body><div id="viewport"><main id="dungeon">
+<header><div class="brand"><span class="brand-icon">⚔</span><div><h1>CHATQUEST <em>LIVE</em></h1><p>ONE CHAT. ONE PARTY. NO ONE LEFT BEHIND.</p></div></div><div class="connection"><span id="mode">CONNECTING</span><b id="connection">● CONNECTING</b></div></header>
+<section class="journey"><div><span class="eyebrow" id="depth">DEPTH 01 / 06</span><h2 id="room">The Overgrown Gate</h2></div><div class="room-track" id="room-track" aria-label="Dungeon progress"></div></section>
+<div class="battle-grid">
+<section class="panel party-panel"><div class="panel-title"><h3>YOUR PARTY</h3><span id="party-count">0 / 6</span></div><div id="party"></div><div class="party-note">SIX SLOTS · A HUNDRED HEARTBEATS EACH</div></section>
+<section class="panel enemy-panel"><div class="panel-title"><h3>ENCOUNTER</h3><span id="phase">HOSTILE</span></div><div class="enemy-stage"><div class="ambient">✦ &nbsp; · &nbsp; ✧ &nbsp; · &nbsp; ✦</div><div id="monster" class="monster" aria-hidden="true"><i class="horn left"></i><i class="horn right"></i><i class="eye left"></i><i class="eye right"></i><i class="mouth"></i></div><div class="pedestal"></div></div><h2 id="enemy-name">Moss Slime</h2><p id="flavor">The dungeon awaits its heroes.</p><div class="health enemy-health"><div id="enemy-bar"></div></div><div class="enemy-stats"><span id="enemy-hp">26 / 26 HP</span><span id="enemy-damage">18 ATK</span></div></section>
+<section class="panel log-panel"><div class="panel-title"><h3>QUEST LOG</h3><span>LIVE FEED</span></div><ol id="log" aria-live="polite"></ol><div class="log-note">EVERY LEGEND STARTS WITH !join</div></section>
+</div>
+<section class="vote-panel"><div class="vote-heading"><h3 id="round">WAITING FOR HEROES</h3><span id="countdown">TYPE !join IN CHAT</span></div><div class="timer"><div id="timer-bar"></div></div><div id="actions"></div></section>
+<footer><span><b>HOW TO PLAY</b> <strong>!join</strong> enter the party</span><span><strong>!1 / !2 / !3</strong> cast your vote</span><span>MAJORITY RULES · TIES → LOWEST NUMBER</span></footer>
+<div id="result" hidden><div><p class="eyebrow" id="result-label">EXPEDITION COMPLETE</p><h2 id="result-title">VICTORY</h2><p id="result-text"></p><span id="restart"></span></div></div>
+</main></div></body></html>
