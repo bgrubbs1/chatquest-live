@@ -46,7 +46,7 @@ Codex session ID: `01a17e0d-66b5-72b3-9a2e-ccb7949a786b` *(paste from CODEX_SESS
 Node.js, JavaScript, OpenAI Codex, Twitch IRC, Server-Sent Events, HTML/CSS, macOS/OBS
 
 ## Links
-- Code repository: `<GITHUB_REPO_URL>` *(must contain all source + run instructions; public or private shared with judging@devpost.com)*
+- Code repository: https://github.com/bgrubbs1/chatquest-live *(must contain all source + run instructions; public or private shared with judging@devpost.com)*
 - Demo video (<3 min, YouTube, public/unlisted): `<YOUTUBE_URL>`
 
 ## Human checklist (≈25–30 minutes total)
