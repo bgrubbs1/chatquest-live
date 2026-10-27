@@ -2,6 +2,43 @@
 
 Your Twitch chat is the party. Six viewers explore six rooms, vote on combat every 20 seconds, and face **The Lag Lord**, a two-phase boss. A CSS pixel dungeon overlay streams state straight into OBS. Node.js 22+, ESM, zero npm dependencies, no build step, no external assets or fonts.
 
+![ChatQuest Live OBS overlay](docs/cover.png)
+
+## Inspiration
+Chat is normally a passive audience: they watch, they type, and the streamer plays alone. I wanted to flip that — make chat the party. ChatQuest Live turns a Twitch channel into a shared tabletop dungeon crawl that viewers join from chat and that renders as a live OBS overlay.
+
+## What it does
+- Viewers type `!join` to join the party (max 6, 100 HP each) and vote every 20 seconds: `!vote 1` **Strike**, `!vote 2` **Guard**, `!vote 3` **Rally** (also `!1`/`!2`/`!3`). Majority wins; ties go to the lowest number.
+- Six rooms with escalating enemies, ending in a two-phase boss. Downed viewers can be revived by Rally; a full wipe restarts the run with a fresh party.
+- An OBS browser-source overlay shows room depth, party HP and damage, enemy HP, live vote counts with a countdown, and a rolling event log — retro dungeon-terminal style, CSS-only art.
+- Reads Twitch chat **anonymously over IRC** (viewers authorize nothing), with an optional authenticated sender mode for round announcements and a deterministic demo simulator for offline demos.
+
+## How we built it
+Built with **OpenAI Codex** in one thread. I wrote a detailed spec (game rules, overlay requirements, zero-dependency constraints, acceptance tests) and Codex implemented the pure game engine, the Twitch IRC client, the SSE server, the overlay renderer and the test suite — then ran `npm test` and fixed the failures. Stack: Node.js 22, ESM, zero npm dependencies (`node:` builtins only). Codex session ID: `01a17e0d-66b5-72b3-9a2e-ccb7949a786b` (see [`CODEX_SESSION.md`](CODEX_SESSION.md)).
+
+## Challenges
+- Keeping the game deterministic for tests while feeling random to players — solved with a seeded RNG injected in tests.
+- Implementing Twitch IRC safely (PING/PONG keepalive, reconnect, malformed lines) with no npm dependency — hand-rolled TLS line parser plus a fuzz-ish malformed-input test.
+- Making HP bars, vote counts and the event log readable at stream scale in a 1280×720 capture.
+
+## Accomplishments
+- A complete interactive Twitch experience with an OBS-ready overlay, no build step and no viewer OAuth.
+- A real game loop tuned for stream pacing (20s rounds, six rooms, ~5-minute run) instead of a tech demo.
+- 23 tests covering party limits, majority/tie-break, Guard reduction, Rally revive, wipe/restart, boss phases, victory, seeded RNG and live HTTP/SSE responses.
+
+## What we learned
+- How far a strict spec + Codex can go for a real-time app with a hard UI constraint (OBS at 1280×720).
+- Twitch IRC's anonymous read path is a great low-friction way to build chat interactivity without OAuth.
+- Spectator-first design: every state change has to be visible on the overlay, not just in chat.
+
+## What's next
+- Twitch EventSub (subs, raids, channel-point redemptions) as special moves.
+- Per-channel leaderboards and persistent meta-progression between streams.
+- An optional LLM dungeon master narrating rooms in the streamer's voice.
+
+## Built with
+`node.js` · `javascript` · `openai-codex` · `twitch` · `irc` · `server-sent-events` · `html` · `css` · `obs`
+
 ## Try it in 60 seconds
 
 From this directory:
