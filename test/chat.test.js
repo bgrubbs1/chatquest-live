@@ -45,6 +45,9 @@ test('welcome does not claim a channel join; only matching end-of-names does', a
   socket.emit('data', ':tmi.twitch.tv 366 reader #example :End of /NAMES list\r\n');
   assert.equal(chat.ready, true);
   assert.deepEqual(statuses, ['joining channel', 'connected']);
+  socket.emit('data', ':tmi.twitch.tv 001 reader :Welcome, GLHF!\r\n:tmi.twitch.tv 366 reader #example :End of /NAMES list\r\n');
+  assert.equal(chat.ready, true);
+  assert.deepEqual(statuses, ['joining channel', 'connected']);
   chat.close();
 });
 test('bot sender sanitizes messages, queues bursts, and clears on close', () => {

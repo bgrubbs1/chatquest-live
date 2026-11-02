@@ -43,7 +43,7 @@ export class TwitchChat extends EventEmitter {
         const line = buffer.slice(0, end); buffer = buffer.slice(end + 2);
         if (line.startsWith('PING ')) { socket.write(`PONG ${line.slice(5)}\r\n`); continue; }
         // 001 confirms authentication, not membership in the requested room.
-        if (/^:\S+ 001 /.test(line)) this.emit('status', 'joining channel');
+        if (/^:\S+ 001 /.test(line) && !this.ready) this.emit('status', 'joining channel');
         const joined = line.match(/^:\S+ 366 ([a-z0-9_]+) #([a-z0-9_]+)(?: |$)/i);
         if (joined?.[1].toLowerCase() === this.nick && joined?.[2].toLowerCase() === this.channel && !this.ready) {
           this.ready = true;
