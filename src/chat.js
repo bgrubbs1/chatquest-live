@@ -8,7 +8,7 @@ export function parseIrc(line) {
   return match ? { user: match[1].toLowerCase(), text: match[2] } : null;
 }
 export class TwitchChat extends EventEmitter {
-  constructor({ channel, botName, token }) {
+  constructor({ channel, botName, token, socketFactory = tls.connect }) {
     super();
     this.channel = channel.replace(/^#/, '').toLowerCase();
     if (!/^[a-z0-9_]{1,25}$/.test(this.channel)) throw new Error('Invalid TWITCH_CHANNEL; use the channel login name.');
@@ -18,6 +18,7 @@ export class TwitchChat extends EventEmitter {
     this.bot = Boolean(botName && token);
     this.nick = this.bot ? botName.toLowerCase() : 'justinfan742831';
     this.token = token;
+    this.socketFactory = socketFactory;
     this.stopped = false;
     this.ready = false;
     this.lastSentAt = 0;
@@ -26,8 +27,9 @@ export class TwitchChat extends EventEmitter {
   }
   connect() {
     if (this.stopped) return;
+    this.ready = false;
     let buffer = '';
-    const socket = this.socket = tls.connect({ host: 'irc.chat.twitch.tv', port: 6697, servername: 'irc.chat.twitch.tv' }, () => {
+    const socket = this.socket = this.socketFactory({ host: 'irc.chat.twitch.tv', port: 6697, servername: 'irc.chat.twitch.tv' }, () => {
       if (this.bot) socket.write(`PASS ${this.token.startsWith('oauth:') ? this.token : `oauth:${this.token}`}\r\n`);
       if (!this.bot) socket.write('PASS SCHMOOPIIE\r\n');
       socket.write(`NICK ${this.nick}\r\nJOIN #${this.channel}\r\n`);
@@ -41,7 +43,14 @@ export class TwitchChat extends EventEmitter {
       while ((end = buffer.indexOf('\r\n')) >= 0) {
         const line = buffer.slice(0, end); buffer = buffer.slice(end + 2);
         if (line.startsWith('PING ')) { socket.write(`PONG ${line.slice(5)}\r\n`); continue; }
-        if (/^:\S+ 001 /.test(line)) { this.ready = true; this.retryMs = 1000; this.emit('status', 'connected'); }
+        // 001 confirms authentication, not membership in the requested room.
+        if (/^:\S+ 001 /.test(line)) this.emit('status', 'joining channel');
+        const joined = line.match(/^:\S+ 366 ([a-z0-9_]+) #([a-z0-9_]+)(?: |$)/i);
+        if (joined?.[1].toLowerCase() === this.nick && joined?.[2].toLowerCase() === this.channel && !this.ready) {
+          this.ready = true;
+          this.retryMs = 1000;
+          this.emit('status', 'connected');
+        }
         if (line.startsWith('RECONNECT')) socket.destroy();
         if (/Login authentication failed|Improperly formatted auth/i.test(line)) this.emit('status', 'authentication failed; check bot credentials');
         const message = parseIrc(line);

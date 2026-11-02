@@ -1,6 +1,7 @@
 /** IRC parser robustness without opening a Twitch connection. */
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { EventEmitter } from 'node:events';
 import { parseIrc, TwitchChat } from '../src/chat.js';
 test('parses ordinary and tagged Twitch messages', () => {
   assert.deepEqual(parseIrc(':Hero!hero@hero.tmi.twitch.tv PRIVMSG #channel :!join'), { user: 'hero', text: '!join' });
@@ -16,6 +17,35 @@ test('anonymous mode needs no credentials; bot mode requires a complete safe pai
   assert.throws(() => new TwitchChat({ channel: 'example', botName: 'bot' }), /both/);
   assert.throws(() => new TwitchChat({ channel: 'example', botName: 'bot', token: 'bad\ntoken' }), /Invalid/);
 });
+test('welcome does not claim a channel join; only matching end-of-names does', async () => {
+  const socket = new EventEmitter();
+  const writes = [];
+  socket.write = text => writes.push(text);
+  socket.setEncoding = () => {};
+  socket.setTimeout = () => {};
+  socket.destroy = () => socket.emit('close');
+  const chat = new TwitchChat({ channel: 'example', socketFactory: (_options, onConnect) => {
+    queueMicrotask(onConnect);
+    return socket;
+  } });
+  const statuses = [];
+  chat.on('status', status => statuses.push(status));
+  chat.connect();
+  await Promise.resolve();
+  assert.ok(writes.some(text => text.includes('JOIN #example')));
+  socket.emit('data', ':tmi.twitch.tv 001 justinfan742831 :Welcome, GLHF!\r\n');
+  assert.equal(chat.ready, false);
+  assert.deepEqual(statuses, ['joining channel']);
+  socket.emit('data', ':tmi.twitch.tv 366 justinfan742831 #other :End of /NAMES list\r\n');
+  assert.equal(chat.ready, false);
+  socket.emit('data', ':tmi.twitch.tv 366 another #example :End of /NAMES list\r\n');
+  assert.equal(chat.ready, false);
+  socket.emit('data', ':tmi.twitch.tv 366 justinfan742831 #example :End of /NAMES list\r\n');
+  assert.equal(chat.ready, true);
+  assert.deepEqual(statuses, ['joining channel', 'connected']);
+  chat.close();
+});
+
 test('bot sender sanitizes messages, queues bursts, and clears on close', () => {
   const chat = new TwitchChat({ channel: 'example', botName: 'bot', token: 'placeholder' });
   const sent = [];
