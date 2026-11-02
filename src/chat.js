@@ -1,4 +1,4 @@
-/** Minimal resilient Twitch IRC/TLS transport; anonymous reads, optional bot writes. */
+/** Minimal Twitch IRC/TLS transport; authenticated reads, optional bot writes. */
 import tls from 'node:tls';
 import { EventEmitter } from 'node:events';
 
@@ -8,15 +8,15 @@ export function parseIrc(line) {
   return match ? { user: match[1].toLowerCase(), text: match[2] } : null;
 }
 export class TwitchChat extends EventEmitter {
-  constructor({ channel, botName, token, socketFactory = tls.connect }) {
+  constructor({ channel, botName, token, sendAnnouncements = false, socketFactory = tls.connect }) {
     super();
     this.channel = channel.replace(/^#/, '').toLowerCase();
     if (!/^[a-z0-9_]{1,25}$/.test(this.channel)) throw new Error('Invalid TWITCH_CHANNEL; use the channel login name.');
-    if (Boolean(botName) !== Boolean(token)) throw new Error('Set both TWITCH_BOT_NAME and TWITCH_OAUTH_TOKEN for bot mode.');
+    if (!botName || !token) throw new Error('Live Twitch IRC requires both TWITCH_BOT_NAME and TWITCH_OAUTH_TOKEN with chat:read access.');
     if (botName && !/^[a-zA-Z0-9_]{1,25}$/.test(botName)) throw new Error('Invalid TWITCH_BOT_NAME.');
     if (token && /[\s\r\n]/.test(token)) throw new Error('Invalid TWITCH_OAUTH_TOKEN.');
-    this.bot = Boolean(botName && token);
-    this.nick = this.bot ? botName.toLowerCase() : 'justinfan742831';
+    this.bot = Boolean(sendAnnouncements);
+    this.nick = botName.toLowerCase();
     this.token = token;
     this.socketFactory = socketFactory;
     this.stopped = false;
@@ -30,8 +30,7 @@ export class TwitchChat extends EventEmitter {
     this.ready = false;
     let buffer = '';
     const socket = this.socket = this.socketFactory({ host: 'irc.chat.twitch.tv', port: 6697, servername: 'irc.chat.twitch.tv' }, () => {
-      if (this.bot) socket.write(`PASS ${this.token.startsWith('oauth:') ? this.token : `oauth:${this.token}`}\r\n`);
-      if (!this.bot) socket.write('PASS SCHMOOPIIE\r\n');
+      socket.write(`PASS ${this.token.startsWith('oauth:') ? this.token : `oauth:${this.token}`}\r\n`);
       socket.write(`NICK ${this.nick}\r\nJOIN #${this.channel}\r\n`);
     });
     socket.setEncoding('utf8');
@@ -52,7 +51,7 @@ export class TwitchChat extends EventEmitter {
           this.emit('status', 'connected');
         }
         if (line.startsWith('RECONNECT')) socket.destroy();
-        if (/Login authentication failed|Improperly formatted auth/i.test(line)) this.emit('status', 'authentication failed; check bot credentials');
+        if (/Login authentication failed|Improperly formatted auth/i.test(line)) this.emit('status', 'authentication failed; check Twitch credentials');
         const message = parseIrc(line);
         if (message) this.emit('message', message);
       }

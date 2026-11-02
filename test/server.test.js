@@ -29,4 +29,5 @@ test('demo HTTP serves status, overlay, assets, JSON and initial SSE state', asy
 });
 test('live mode without channel fails with actionable error', async () => {
   await assert.rejects(createServer(), /TWITCH_CHANNEL.*npm run demo/);
+  await assert.rejects(createServer({ channel: 'example' }), /TWITCH_BOT_NAME.*TWITCH_OAUTH_TOKEN/);
 });

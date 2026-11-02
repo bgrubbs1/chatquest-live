@@ -11,7 +11,7 @@ Chat is normally a passive audience: they watch, they type, and the streamer pla
 - Viewers type `!join` to join the party (max 6, 100 HP each) and vote every 20 seconds: `!vote 1` **Strike**, `!vote 2` **Guard**, `!vote 3` **Rally** (also `!1`/`!2`/`!3`). Majority wins; ties go to the lowest number.
 - Six rooms with escalating enemies, ending in a two-phase boss. Downed viewers can be revived by Rally; a full wipe restarts the run with a fresh party.
 - An OBS browser-source overlay shows room depth, party HP and damage, enemy HP, live vote counts with a countdown, and a rolling event log — retro dungeon-terminal style, CSS-only art.
-- Reads Twitch chat **anonymously over IRC** (viewers authorize nothing), with an optional authenticated sender mode for round announcements and a deterministic demo simulator for offline demos.
+- Reads Twitch chat over IRC with a streamer's `chat:read` user token (viewers authorize nothing). A deterministic simulator runs offline demos without a Twitch account.
 
 ## How we built it
 Built with **OpenAI Codex** in one thread. I wrote a detailed spec (game rules, overlay requirements, zero-dependency constraints, acceptance tests) and Codex implemented the pure game engine, the Twitch IRC client, the SSE server, the overlay renderer and the test suite — then ran `npm test` and fixed the failures. Stack: Node.js 22, ESM, zero npm dependencies (`node:` builtins only). Codex session ID: `01a17e0d-66b5-72b3-9a2e-ccb7949a786b` (see [`CODEX_SESSION.md`](CODEX_SESSION.md)).
@@ -22,13 +22,13 @@ Built with **OpenAI Codex** in one thread. I wrote a detailed spec (game rules, 
 - Making HP bars, vote counts and the event log readable at stream scale in a 1280×720 capture.
 
 ## Accomplishments
-- A complete interactive Twitch experience with an OBS-ready overlay, no build step and no viewer OAuth.
+- An OBS-ready interactive game with no build step or viewer OAuth; the offline simulator is ready for demos.
 - A real game loop tuned for stream pacing (20s rounds, six rooms, ~5-minute run) instead of a tech demo.
 - 23 tests covering party limits, majority/tie-break, Guard reduction, Rally revive, wipe/restart, boss phases, victory, seeded RNG and live HTTP/SSE responses.
 
 ## What we learned
 - How far a strict spec + Codex can go for a real-time app with a hard UI constraint (OBS at 1280×720).
-- Twitch IRC's anonymous read path is a great low-friction way to build chat interactivity without OAuth.
+- Twitch IRC authentication and channel membership are separate: a server welcome must not be shown as a successful room join.
 - Spectator-first design: every state change has to be visible on the overlay, not just in chat.
 
 ## What's next
@@ -61,39 +61,19 @@ The status page is **http://localhost:8787/**. Stop with Ctrl+C. Override the po
 
 ## Run live on Twitch
 
-```sh
-TWITCH_CHANNEL=your_channel_login npm start
-```
-
-Use the channel login, without a Twitch URL (`#` prefix is accepted). The server reads Twitch IRC over verified TLS at `irc.chat.twitch.tv:6697`, using an anonymous `justinfan` identity. No credentials are needed for reading. The HTTP server binds only to `127.0.0.1`. Live mode only contacts Twitch; demo mode makes no external network calls.
-
-Open your channel chat and type `!join`. Up to six unique viewers can join, including during combat. Members vote with `!vote 1`, `!vote 2`, `!vote 3`, or `!1`, `!2`, `!3`. Commands ignore case. A later vote replaces your earlier vote. Unjoined users cannot vote. `!help` logs instructions locally; bot mode also sends them to chat. Command and connection activity appears in the terminal.
-
-With no `TWITCH_CHANNEL`, live mode exits with an actionable error. Connection failures retry with backoff up to 30 seconds. Check the overlay's connection label and server log when diagnosing chat connectivity.
-
-### Optional sending bot
-
-Reading works without a bot. To send announcements, use an account you control and a user OAuth token for that account.
-
-1. Register an application in the [Twitch developer console](https://dev.twitch.tv/console/apps), with redirect URI `http://localhost:8787/`.
-2. While logged in as the bot account, open this URL, replacing `YOUR_CLIENT_ID`:
-
-   ```text
-   https://id.twitch.tv/oauth2/authorize?client_id=YOUR_CLIENT_ID&redirect_uri=http%3A%2F%2Flocalhost%3A8787%2F&response_type=token&scope=chat%3Aread%20chat%3Aedit&state=chatquest_local_setup
-   ```
-
-3. Approve access. Copy only the `access_token` value from the redirected URL fragment. Keep it private and clear the fragment afterward.
-4. Set `TWITCH_BOT_NAME` to that account's login and `TWITCH_OAUTH_TOKEN` to the token (with or without `oauth:`).
-
-The [official OAuth guide](https://dev.twitch.tv/docs/authentication/getting-tokens-oauth/#implicit-grant-flow) explains this flow. Twitch IRC uses the [`chat:read` and `chat:edit` scopes](https://dev.twitch.tv/docs/chat/irc/). Tokens expire; generate a replacement when necessary.
-
-`.env.example` lists the supported names with empty values. To load a private `.env`, use Node's built-in loader:
+Create a private `.env` from `.env.example` with `TWITCH_CHANNEL`, `TWITCH_BOT_NAME` (the authorized reader account login), and `TWITCH_OAUTH_TOKEN` (a user token with `chat:read`). Obtain the token through the [official Twitch OAuth guide](https://dev.twitch.tv/docs/authentication/getting-tokens-oauth/). Do not commit the token or use a third-party token generator.
 
 ```sh
 node --env-file=.env src/server.js
 ```
 
-Set both bot variables together, or leave both empty. The bot sends round announcements, action summaries, room clears, boss phases, outcomes and help with a bounded, rate-limited queue. Tokens are never included in logs, `/state`, or SSE. No client secret is required by this project. `.env` is ignored by version control.
+Use the channel login, without a Twitch URL (`#` prefix is accepted). The server reads Twitch IRC over verified TLS at `irc.chat.twitch.tv:6697`. [Twitch's current IRC documentation](https://dev.twitch.tv/docs/irc/tags/) requires user-token authentication; [`chat:read`](https://dev.twitch.tv/docs/authentication/scopes/) is the read scope. The HTTP server binds only to `127.0.0.1`. Live mode only contacts Twitch; demo mode makes no external network calls. Live Twitch operation still needs to be verified with an authorized channel before submission.
+
+Open your channel chat and type `!join`. Up to six unique viewers can join, including during combat. Members vote with `!vote 1`, `!vote 2`, `!vote 3`, or `!1`, `!2`, `!3`. Commands ignore case. A later vote replaces your earlier vote. Unjoined users cannot vote. `!help` logs instructions locally. The server does not send chat messages. Command and connection activity appears in the terminal.
+
+With no `TWITCH_CHANNEL` or reader credentials, live mode exits with an actionable error. Connection failures retry with backoff up to 30 seconds. The overlay reports connected only after the requested channel's join confirmation. Check its connection label and server log when diagnosing chat connectivity.
+
+`.env.example` lists the supported names with empty values. Set both reader variables together. Tokens are never included in logs, `/state`, or SSE. No client secret is required by this project. `.env` is ignored by version control. The optional sender code remains disabled in the server; `chat:edit` permission is not needed for the current build.
 
 ## Add to OBS
 

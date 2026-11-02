@@ -15,7 +15,7 @@ Chat is normally a passive audience: they watch, they type, and the streamer pla
 - Viewers type `!join` to join the party (max 6, 100 HP each), `!vote 1|2|3` (or `!1/!2/!3`) to vote on the next action: **Strike**, **Guard**, or **Rally**. Majority wins; ties go to the lowest number; 20-second rounds.
 - The party crawls through six rooms with escalating enemies and ends with a two-phase boss, *The Lag Lord*. Downed viewers can be revived by Rally; a full wipe restarts the run with a fresh party.
 - A streamer-friendly **OBS browser-source overlay** shows room depth, party HP bars and damage dealt, enemy HP, live vote counts + countdown, and a rolling event log — all in a retro dungeon-terminal style with CSS-only art.
-- The bot reads chat anonymously over Twitch IRC (viewers don't authorize anything); there's an optional authenticated sender mode for round announcements, plus a deterministic demo simulator so the whole experience can be demoed offline.
+- The server reads Twitch IRC with a streamer's `chat:read` user token (viewers don't authorize anything). It sends no chat messages; a deterministic simulator runs the experience offline.
 
 ## How I built it
 I built it with **OpenAI Codex**. I wrote a detailed product spec (game rules, overlay requirements, zero-dependency constraints, acceptance tests) and Codex implemented the pure game engine, the Twitch IRC client, the SSE server, the overlay renderer and the test suite in one thread — then ran `npm test` and fixed failures. The project is Node.js 22 with **zero external dependencies** (node: builtins only), which keeps it fast to run and easy to judge.
@@ -24,7 +24,7 @@ Codex session ID: `01a17e0d-66b5-72b3-9a2e-ccb7949a786b` *(paste from CODEX_SESS
 
 ## Challenges I ran into
 - Keeping the game deterministic for tests while still feeling random to players — solved with a seeded RNG used by the engine and injected in tests.
-- Parsing Twitch IRC safely (malformed lines, PING/PONG keepalive, anonymous `justinfan` login) without any npm dependency — hand-rolled TLS + line parser with a fuzz-ish malformed-input test.
+- Parsing Twitch IRC safely (malformed lines, PING/PONG keepalive, and channel join confirmation) without any npm dependency - hand-rolled TLS + line parser with regression tests.
 - Making the overlay readable in a 1280×720 capture: legible HP bars, vote counts and log at stream scale.
 
 ## Accomplishments I'm proud of
@@ -34,7 +34,7 @@ Codex session ID: `01a17e0d-66b5-72b3-9a2e-ccb7949a786b` *(paste from CODEX_SESS
 
 ## What I learned
 - How far a small, strict spec + Codex can go for a real-time app with a UI constraint (OBS).
-- Twitch IRC's anonymous read path is a great low-friction way to build chat interactivity without OAuth.
+- Twitch IRC requires authenticated reading, and its server welcome does not prove that the requested channel was joined.
 - Designing for spectators: every state change has to be visible on the overlay, not just in chat.
 
 ## What's next
@@ -52,7 +52,7 @@ Node.js, JavaScript, OpenAI Codex, Twitch IRC, Server-Sent Events, HTML/CSS, mac
 ## Human checklist (≈25–30 minutes total)
 1. **GitHub (2 min):** create a public repo, then from the project folder:
    `git init && git add -A && git commit -m "ChatQuest Live" && git branch -M main && git remote add origin <repo-url> && git push -u origin main`
-2. **Twitch (5 min):** you already have a Twitch account/channel; note your channel name. Optionally create an OAuth token at https://twitchtokengenerator.com for sender mode (never commit it).
+2. **Twitch:** verify an account/channel you control and obtain a `chat:read` user token through [Twitch's official OAuth guide](https://dev.twitch.tv/docs/authentication/getting-tokens-oauth/). Keep it private and verify a real chat message reaches the overlay.
 3. **Codex (0 min):** session ID is already captured in `CODEX_SESSION.md` from the build thread; if you prefer, open the same thread in Codex and copy the ID.
 4. **Demo video (10–15 min):** follow `DEMO.md`. Record with QuickTime (or OBS), keep <3:00, show it running on Twitch and show the Codex session. Upload to YouTube as Public/Unlisted.
 5. **Devpost (5 min):** https://twitchcon-codex.devpost.com/ → Join Hackathon → paste this copy, fill repo URL, YouTube URL, Codex session ID, submit by **Mon 2026-11-02 17:00 ET**.

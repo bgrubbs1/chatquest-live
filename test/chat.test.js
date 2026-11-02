@@ -10,13 +10,15 @@ test('parses ordinary and tagged Twitch messages', () => {
 test('malformed IRC never throws and protocol lines are ignored', () => {
   for (const line of [null, undefined, 7, '', 'PING :tmi.twitch.tv', ':bad', ':x!h PRIVMSG', 'x'.repeat(9000), ':server 001 nick :Welcome']) assert.equal(parseIrc(line), null);
 });
-test('anonymous mode needs no credentials; bot mode requires a complete safe pair', () => {
-  assert.equal(new TwitchChat({ channel: '#example' }).bot, false);
-  assert.equal(new TwitchChat({ channel: 'example', botName: 'bot', token: 'oauth:placeholder' }).bot, true);
+test('live reading requires credentials and sending stays disabled by default', () => {
+  assert.throws(() => new TwitchChat({ channel: '#example' }), /requires both/);
+  assert.equal(new TwitchChat({ channel: 'example', botName: 'bot', token: 'oauth:placeholder' }).bot, false);
+  assert.equal(new TwitchChat({ channel: 'example', botName: 'bot', token: 'oauth:placeholder', sendAnnouncements: true }).bot, true);
   assert.throws(() => new TwitchChat({ channel: 'bad\r\nJOIN #x' }), /Invalid/);
   assert.throws(() => new TwitchChat({ channel: 'example', botName: 'bot' }), /both/);
   assert.throws(() => new TwitchChat({ channel: 'example', botName: 'bot', token: 'bad\ntoken' }), /Invalid/);
 });
+
 test('welcome does not claim a channel join; only matching end-of-names does', async () => {
   const socket = new EventEmitter();
   const writes = [];
@@ -24,7 +26,7 @@ test('welcome does not claim a channel join; only matching end-of-names does', a
   socket.setEncoding = () => {};
   socket.setTimeout = () => {};
   socket.destroy = () => socket.emit('close');
-  const chat = new TwitchChat({ channel: 'example', socketFactory: (_options, onConnect) => {
+  const chat = new TwitchChat({ channel: 'example', botName: 'reader', token: 'placeholder', socketFactory: (_options, onConnect) => {
     queueMicrotask(onConnect);
     return socket;
   } });
@@ -33,21 +35,20 @@ test('welcome does not claim a channel join; only matching end-of-names does', a
   chat.connect();
   await Promise.resolve();
   assert.ok(writes.some(text => text.includes('JOIN #example')));
-  socket.emit('data', ':tmi.twitch.tv 001 justinfan742831 :Welcome, GLHF!\r\n');
+  socket.emit('data', ':tmi.twitch.tv 001 reader :Welcome, GLHF!\r\n');
   assert.equal(chat.ready, false);
   assert.deepEqual(statuses, ['joining channel']);
-  socket.emit('data', ':tmi.twitch.tv 366 justinfan742831 #other :End of /NAMES list\r\n');
+  socket.emit('data', ':tmi.twitch.tv 366 reader #other :End of /NAMES list\r\n');
   assert.equal(chat.ready, false);
-  socket.emit('data', ':tmi.twitch.tv 366 another #example :End of /NAMES list\r\n');
+  socket.emit('data', ':tmi.twitch.tv 366 other #example :End of /NAMES list\r\n');
   assert.equal(chat.ready, false);
-  socket.emit('data', ':tmi.twitch.tv 366 justinfan742831 #example :End of /NAMES list\r\n');
+  socket.emit('data', ':tmi.twitch.tv 366 reader #example :End of /NAMES list\r\n');
   assert.equal(chat.ready, true);
   assert.deepEqual(statuses, ['joining channel', 'connected']);
   chat.close();
 });
-
 test('bot sender sanitizes messages, queues bursts, and clears on close', () => {
-  const chat = new TwitchChat({ channel: 'example', botName: 'bot', token: 'placeholder' });
+  const chat = new TwitchChat({ channel: 'example', botName: 'bot', token: 'placeholder', sendAnnouncements: true });
   const sent = [];
   chat.socket = { write: value => sent.push(value), destroy() {} };
   chat.ready = true;
